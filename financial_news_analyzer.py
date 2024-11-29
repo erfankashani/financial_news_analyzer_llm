@@ -1,9 +1,8 @@
 import os
-import requests
 from dotenv import load_dotenv
-from bs4 import BeautifulSoup
 from openai import OpenAI
 import re
+from helper.utils import Website
 
 
 def validate_open_ai_api_key(api_key:str):
@@ -23,17 +22,6 @@ validate_open_ai_api_key(api_key)
 
 openai = OpenAI()
 
-# represent the News page based on the URL
-class NewsPage():
-    def __init__(self, url):
-        self.url = url
-        response = requests.get(url)
-        soup = BeautifulSoup(response.content, 'html.parser')
-        self.title = soup.title.string if soup.title else "No title found"
-        for irrelevant_tag in soup.body(["script", "style", "img", "input"]):
-            irrelevant_tag.decompose()
-        self.text = soup.body.get_text(strip=True)
-
 
 # generate prompts
 SYSTEM_PROMPT = "You are an investment analyst, your role is to read the provided news article, provide a summary, and point out the top three company names or stock tickers that get impacted by this news. \
@@ -41,15 +29,15 @@ provide your reasoning. \
 ignoring text that might be navigation related. \
 respond in markdown."
 
-def user_prompt_for_news(news_page: NewsPage) -> str:
-    user_prompt = f"you are looking at a news article titled '{news_page.title}'."
+def user_prompt_for_news(web_page: Website) -> str:
+    user_prompt = f"you are looking at a news article titled '{web_page.title}'."
     user_prompt += "The content of the website is as follows; \
     Please provide a summary of the article in markdown. \
     Point out the top three company names or stock tickers that will get impacted by this news while Provide your reasoning.\n\n"
-    user_prompt += news_page.text
+    user_prompt += web_page.text
     return user_prompt
 
-def messages_for_news(news_page: NewsPage) -> list:
+def messages_for_news(web_page: Website) -> list:
     return [
         {
             "role": "system",
@@ -57,15 +45,15 @@ def messages_for_news(news_page: NewsPage) -> list:
         },
         {
             "role": "user",
-            "content": user_prompt_for_news(news_page)
+            "content": user_prompt_for_news(web_page)
         }
     ]
 
 def analyze_news(url: str):
-    news_page = NewsPage(url)
+    web_page = Website(url)
     response = openai.chat.completions.create(
         model = "gpt-4o-mini",
-        messages = messages_for_news(news_page)
+        messages = messages_for_news(web_page)
     )
     return response.choices[0].message.content
 
